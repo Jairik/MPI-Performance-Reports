@@ -77,6 +77,10 @@ def get_general_admahls_plot(lib) -> go.Figure:
     # Return the plot
     return fig
 
+def get_num_cores() -> int:
+    ''' Get the number of available CPU cores on the host machine '''
+    return os.cpu_count()
+
 def add_cur_theoretical(lib, fig: go.Figure, fp: float) -> go.Figure:
     ''' Add the current fP for the provided .c program to the theoretical Amdahl's Law plot '''
     P = np.array([5, 10, 100, 1000, 10000])  # Scenarios for number of processors
