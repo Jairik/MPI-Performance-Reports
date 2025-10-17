@@ -29,6 +29,19 @@ def run_executable(x: int = 10000000, np: int = 4) -> str:
         exit(1)
     return result.stdout  # Return the output for further processing
 
+def load_c_library(lib_path: str = "algorithmslib.so") -> ctypes.CDLL:
+    ''' Load the C shared library for performance calculations '''
+    lib = ctypes.CDLL(lib_path)
+    # Declaring argument types
+    lib.getSpeedup.argtypes = [ctypes.c_double, ctypes.c_double]
+    lib.getEfficiency.argtypes = [ctypes.c_double, ctypes.c_int]
+    lib.getAmdahlsLaw.argtypes = [ctypes.c_double, ctypes.c_double]
+    # Declaring the return types
+    lib.getSpeedup.restype = ctypes.c_double
+    lib.getEfficiency.restype = ctypes.c_double
+    lib.getAmdahlsLaw.restype = ctypes.c_double
+    return lib
+
 def get_general_admahls_plot(lib) -> go.Figure:
     ''' Generate a generalized plot for Amdahl's Law '''
     FP = np.array([0.5, 0.75, 0.9, 0.95])  # Fractions of the program that are parallelizable
@@ -51,7 +64,7 @@ def get_general_admahls_plot(lib) -> go.Figure:
         
     # Format the layout with title and axis titles
     fig.update_layout(
-        title='Amdahl\'s Law: Speedup vs Number of Processors',
+        title='Amdahl\'s Law: Speedup vs Number of Processors (Theoretical)',
         xaxis_title='Number of Processors (P)',
         yaxis_title='Speedup (Sₚ)',
         legend=dict(title='Parallel Fraction (fₚ)', x=0.01, y=0.99),
@@ -63,21 +76,41 @@ def get_general_admahls_plot(lib) -> go.Figure:
 
     # Return the plot
     return fig
+
+def add_cur_theoretical(lib, fig: go.Figure, fp: float) -> go.Figure:
+    ''' Add the current fP for the provided .c program to the theoretical Amdahl's Law plot '''
+    P = np.array([5, 10, 100, 1000, 10000])  # Scenarios for number of processors
+    S_VALS = np.array([5, 10, 100, 1000, 10000])  # Speedup value scenarios to label
+    COLOR = 'green'  # Color for the current fP line
     
+    # Add a line to the current plot
+    speedups = [lib.getAmdahlsLaw(fp, p) for p in P]  # Calculate the theoretical speedup values
+    fig.add_trace(go.Scatter(
+        x=P,  # fp on the x-axis
+        y=speedups,  # Calculated speedup on the y-axis
+        name=f'Provided Program (fₚ={fp})',  # Label the line
+        mode='lines+markers',  # Add lines and markers at known points
+        line=dict(width=2, color=COLOR, dash='dash'),  # Line width and dashed style
+        marker=dict(size=6, color=COLOR)  # Marker size and color
+    ))
+    
+    return fig
+
+def get_speedup(lib, T1: float, Tp: float) -> float:
+    ''' Wrapper function to get speedup from the C library '''
+    return lib.getSpeedup(T1, Tp)
+
+def get_efficiency(lib, T1: float, p: int) -> float:
+    ''' Wrapper function to get efficiency from the C library '''
+    return lib.getEfficiency(T1, p)
+
+# NOT TO BE USED - WILL BE REPLACED BY ENDPOINTS AND WHATNOT
 def main():
     # Compile the MPI C program
     compile_mpi_program()
     
-    # Load the shared C library for speedup, efficiency, and Amdahl's Law aglorithms
-    lib = ctypes.CDLL('./libalgorithms.so')
-    # Declaring argument types
-    lib.getSpeedup.argtypes = [ctypes.c_double, ctypes.c_double]
-    lib.getEfficiency.argtypes = [ctypes.c_double, ctypes.c_int]
-    lib.getAmdahlsLaw.argtypes = [ctypes.c_double, ctypes.c_double]
-    # Declaring the return types
-    lib.getSpeedup.restype = ctypes.c_double
-    lib.getEfficiency.restype = ctypes.c_double
-    lib.getAmdahlsLaw.restype = ctypes.c_double
+    # Get the shared library
+    lib = load_c_library()
     
     # Get the general Amdahl's Law plot
     amdahls_plot = get_general_admahls_plot(lib)
