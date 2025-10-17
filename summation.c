@@ -32,8 +32,8 @@ int main(int argc, char** argv) {
         for(long long i = 1; i <= n; i++){
             localSum += i;
         }
-        printf("Total Sum from 1 to %lld: %lld\n", n, localSum);
         printf("Serial Run Time (seconds): %f\n", MPI_Wtime() - startTime);
+        printf("Summation from 1 to %lld: %lld\n", n, localSum);
     }
     // Else, run in parallel using MPI
     else{

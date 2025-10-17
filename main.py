@@ -6,7 +6,7 @@ Holds the following endpoints
 '''
 
 from flask import Flask, Response  # Defining endpoints
-import generate_report as gp  # Importing generate_report module to access its functions
+import general_utils as gp  # Importing defined utils
 
 app = Flask(__name__)  # Instantiate the app
 
@@ -17,22 +17,21 @@ gp.compile_mpi_program()
 lib = gp.load_c_library()
 
 @app.get('/api/cores')
-def get_cores():
+def get_cores() -> dict:
     ''' Get the number of available CPU cores on the host machine '''
-    num_cores = int(gp.get_num_cores())
-    return {'cores': num_cores}
+    num_cores = int(gp.get_num_cores())  # Get number of cores from generate_report module
+    return {'cores': num_cores}  # Return as JSON response
     
 @app.post('/api/graph')
-def get_graph():
+def get_graph() -> Response:
     ''' Get the HTML embedding of the Amdahl's Law graph and return as pure HTML '''
-    lib = gp.load_c_library()
     fig = gp.get_general_admahls_plot(lib)
-    html_graph = fig.to_html(full_html=False)
-    return Response(html_graph, mimetype='text/html')
+    html_graph = fig.to_html(full_html=False)  # Convert the plot to HTML format
+    return Response(html_graph, mimetype='text/html')  # Return as HTML response
 
 @app.post('/api/analysis')
-def get_analysis():
-    ''' Get analysis stats for each core '''
+def get_analysis(filename: str = 'summation.c', x: int = 10000000, np: int = 4) -> dict:
+    ''' Get analysis stats execution on each core '''
     # TODO
 
 if __name__ == "__main__":

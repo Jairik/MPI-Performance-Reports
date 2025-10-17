@@ -1,4 +1,4 @@
-''' Main.py - Entry point for performance analysis, intaking the summation.c results and presenting it in meaningful ways. '''
+''' Helper functions for performance analysis '''
 
 import subprocess
 import os
@@ -14,7 +14,6 @@ def compile_mpi_program() -> None:
     ''' Attempt to compile the globally defined MPI C program using mpicc '''
     try:
         subprocess.run(['mpicc', c_file, '-o', executable], check=True)
-        print(f"Successfully compiled {c_file} to {executable} using mpicc.")  # Debugging statement for now
     except subprocess.CalledProcessError as e:
         print(f"Compilation failed: {e}")
         exit(1)
@@ -23,11 +22,42 @@ def run_executable(x: int = 10000000, np: int = 4) -> str:
     ''' Attempt to run the globally defined executable using mpirun with a specified number of processes and x parameter '''
     try:
         result = subprocess.run(['mpirun', '-np', f'{np}', f'./{executable}', f'{x}'], capture_output=True, text=True, check=True)
-        print(result.stdout)  # Debugging: print the output
     except subprocess.CalledProcessError as e:
         print(f"Execution failed: {e}")
         exit(1)
     return result.stdout  # Return the output for further processing
+
+def parse_execution_output(output: str) -> dict:
+    ''' Parse the output from the C program execution assign everything to a dictionary '''
+    lines: list[str] = output.strip().split('\n')  # Split output into lines
+    results: dict = {}  # Initialize results dictionary
+    for line in lines:
+        # Extract run time values
+        if "run time" in line:
+            # Extract per-core information for parallel programs
+            if "MPI" in line:
+                parts = line.split()  # Split line into parts by spaces
+                rank = int(parts[5])  # Extract rank number, which should be at index 5
+                time = float(parts[-1])  # Extract time value, which should be last
+                results[f'rank {rank}'] = time  # Store in dictionary with rank as key
+            # Extract serial information by seperate key
+            elif "Serial" in line:
+                parts = line.split()  # Split line into parts by spaces
+                time = float(parts[-1])  # Extract time value, which should be last
+                results['serial'] = time  # Store in dictionary with 'serial' as key
+        # Extract total summation value
+        elif "Summation" in line:
+            parts = line.split()  # Split line into parts by spaces
+            total = int(parts[-1])  # Extract total summation value, which should be last
+            results['total'] = total  # Store in dictionary with 'total' as key
+        # Extract the benchmarked fraction of parallelizable code value
+        elif "Fraction of Parallel" in line:
+            parts = line.split()  # Split line into parts by spaces
+            fp = float(parts[-1]).round(5)  # Extract fraction value, which should be last
+            results['fp'] = fp  # Store in dictionary with 'fp' as key
+    
+    # Return the sorted results dictionary
+    return dict(sorted(results.items(), key=lambda x: (isinstance(x[0], int), x[0])))
 
 def load_c_library(lib_path: str = "algorithmslib.so") -> ctypes.CDLL:
     ''' Load the C shared library for performance calculations '''
@@ -77,10 +107,6 @@ def get_general_admahls_plot(lib) -> go.Figure:
     # Return the plot
     return fig
 
-def get_num_cores() -> int:
-    ''' Get the number of available CPU cores on the host machine '''
-    return os.cpu_count()
-
 def add_cur_theoretical(lib, fig: go.Figure, fp: float) -> go.Figure:
     ''' Add the current fP for the provided .c program to the theoretical Amdahl's Law plot '''
     P = np.array([5, 10, 100, 1000, 10000])  # Scenarios for number of processors
@@ -98,7 +124,7 @@ def add_cur_theoretical(lib, fig: go.Figure, fp: float) -> go.Figure:
         marker=dict(size=6, color=COLOR)  # Marker size and color
     ))
     
-    return fig
+    return fig    
 
 def get_speedup(lib, T1: float, Tp: float) -> float:
     ''' Wrapper function to get speedup from the C library '''
@@ -108,16 +134,8 @@ def get_efficiency(lib, T1: float, p: int) -> float:
     ''' Wrapper function to get efficiency from the C library '''
     return lib.getEfficiency(T1, p)
 
-# NOT TO BE USED - WILL BE REPLACED BY ENDPOINTS AND WHATNOT
-def main():
-    # Compile the MPI C program
-    compile_mpi_program()
-    
-    # Get the shared library
-    lib = load_c_library()
-    
-    # Get the general Amdahl's Law plot
-    amdahls_plot = get_general_admahls_plot(lib)
-    amdahls_plot.show()
-    
-    
+def get_num_cores() -> int:
+    ''' Get the number of available CPU cores on the host machine '''
+    cpu_count = os.cpu_count()
+    return cpu_count if cpu_count is not None else 1  # Fallback to 1 if cpu_count() returns None
+
