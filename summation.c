@@ -11,7 +11,7 @@ long long compute_sum(int rank, int size, long long n);  // Computation for each
 int main(int argc, char** argv) {
     // Validate the input arguments
     if (argc != 2) {
-        fprintf(stderr, "Usage: %s <number>\n", argv[0]);  // Print as an error
+        fprintf(stderr, "Usage: %s <number>\n", argv[0]);  // Print to standard error
         return 1;
     }
 

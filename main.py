@@ -1,12 +1,13 @@
 '''
 Holds the following endpoints
     cores: '/api/cores', - Number of available cores on the host computer
-    graph: '/api/graph', - Pure HTML embedding of graph
-    questions: '/api/analysis', - Analysis stats for each core
+    graph: '/api/graph', - Pure HTML embedding of the generalized graph
+    analysis: '/api/analysis', - Analysis stats for each core
 '''
 
 from flask import Flask, Response  # Defining endpoints
 import general_utils as gp  # Importing defined utils
+import ctypes
 
 app = Flask(__name__)  # Instantiate the app
 
@@ -32,7 +33,10 @@ def get_graph() -> Response:
 @app.post('/api/analysis')
 def get_analysis(filename: str = 'summation.c', x: int = 10000000, np: int = 4) -> dict:
     ''' Get analysis stats execution on each core '''
-    # TODO
+    gp.compile_mpi_program(filename)  # Try to compile the provided MPI C program
+    result = gp.run_executable(lib, x, np)  # Run the compiled executable
+    analysis_results: dict = gp.parse_execution_output(lib, result, np)  # Parse the output into a dictionary
+    return analysis_results  # Return the analysis results as JSON response
 
 if __name__ == "__main__":
     app.run()

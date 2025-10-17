@@ -47,3 +47,27 @@ double getAmdahlsLaw(double f, int p) {
     // Return the result of the formula
     return (double)(1 / ((1 - f) / (f / p)));
 }
+
+/* Returns the fraction of the program that is serial using Amdah's Law 
+    Parameters:
+        T1: Execution time on one processor
+        Tp: Execution time on p processors
+        p: Number of processors
+*/
+double getFractionParallelizable(double T1, double Tp, int p) {
+    // Avoid division by zero
+    if (T1 == 0.0) {
+        fprintf(stderr, "Error: T1 cannot be zero.\n");
+        return 0.0;
+    }
+    // Serial case
+    if (p <= 1) {
+        fprintf(stderr, "Error: Number of processors must be greater than one.\n");
+        return 0.0;
+    }
+    // Get the speedup
+    double S = getSpeedup(T1, Tp);
+    // Apply Amdahl's Law rearranged to solve for f
+    double fp = (p * (S - 1)) / ((p - 1) * S);
+    return fp;
+}
