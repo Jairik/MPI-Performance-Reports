@@ -1,11 +1,9 @@
-'''
-Holds the following endpoints
-    systemCores: '/api/cores',
-	reportsGraph: '/api/graph',
-	analysis: '/api/analysis',
+''' Holds the Flask app endpoints to populate the frontend
+        systemCores: '/api/cores',
+        analysis: '/api/analysis'
 '''
 
-from flask import Flask, Response, send_file  # Defining endpoints
+from flask import Flask, Response, send_file, request  # Defining endpoints
 import general_utils as gp  # Importing defined utils
 import ctypes  # Prevent any type issues with C library
 import plotly.graph_objects as go  # Prevent any issues with converting the plot to html
@@ -28,27 +26,27 @@ def get_cores() -> dict:
     ''' Get a list of available CPU cores on the host machine '''
     num_cores = int(gp.get_num_cores())  # Get number of cores from generate_report module
     return {'options': [{'cores': i} for i in range(1, num_cores+1)]}  # Return list as JSON response
-    
-@app.get('/api/graph')
-def get_graph() -> Response:
-    ''' Get the HTML embedding of the Amdahl's Law graph and return as pure HTML '''
-    fig = gp.get_general_admahls_plot(lib)
-    html_graph = fig.to_html(full_html=False, include_plotlyjs='cdn')  # Convert the plot to HTML format
-    return Response(html_graph, mimetype='text/html')  # Return as HTML response
 
 @app.post('/api/analysis')
-def get_analysis(filename: str = 'summation.c', x: int = 1000000000, numP: list[int] = [1, 2, 8]) -> dict:
+def get_analysis() -> dict:
     ''' Get analysis stats execution on each core '''
+    # Extract parameters from JSON body
+    data = request.get_json() or {}
+    filename = data.get('filename', 'summation.c')
+    x = int(data.get('x', 1000000000))
+    numP = data.get('numP', [1, 2, 8])
+    
     gp.compile_mpi_program(filename)  # Try to compile the provided MPI C program
     response: dict = {}  # Initialize response dictionary
     serial_runtime: float = None  # Initialize serial runtime variable
-    print(f"DEBUGGING: numP before processing: {numP}")  # Debug: print the initial numP list
+    print(f"DEBUGGING: Received request - filename: {filename}, x: {x}, numP: {numP}")  # Debug: print the received parameters
     # Ensure 1 is the first element of numP (move it if present, or add it if missing)
     if 1 in numP:
         numP = [1] + [p for p in numP if p != 1]
     else:
         numP = [1] + list(numP)
     # Loop through each number of processes provided and append the results to the response
+    last_graph_html = None  # Store the last graph HTML to add to top-level response
     for np in numP:
         result = gp.run_executable(lib, x, np)  # Run the compiled executable
         analysis_results: dict = gp.parse_execution_output(lib=lib, output=result, np=np, serial_time=serial_runtime)  # Parse the output into a dictionary
@@ -57,8 +55,14 @@ def get_analysis(filename: str = 'summation.c', x: int = 1000000000, numP: list[
             serial_runtime = analysis_results.get('serial', None)  # Store the serial runtime
         fig = gp.get_general_admahls_plot(lib)  # Get the general Amdahl's Law plot
         updated_fig = gp.add_cur_theoretical_to_fig(lib, fig, analysis_results['fp'])  # Add the analysis point to the plot
-        analysis_results['graph'] = updated_fig.to_html(full_html=False)  # Add the updated graph as HTML to the results
+        graph_html = updated_fig.to_html(full_html=False, include_plotlyjs='cdn')  # Convert graph to HTML
+        analysis_results['graph'] = graph_html  # Add the updated graph as HTML to the results
+        last_graph_html = graph_html  # Store for top-level response
         response.setdefault('analyses', []).append({'num_processes': np, **analysis_results})  # Add the analysis results to the response object keyed by number of processes
+    
+    # Add the last graph to the top-level response for easy access
+    if last_graph_html:
+        response['graph'] = last_graph_html
     
     return response
 

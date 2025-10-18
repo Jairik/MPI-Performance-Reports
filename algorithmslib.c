@@ -32,7 +32,7 @@ double getEfficiency(double S, int p) {
 
 /* Returns the maximum speedup according to Amdahl's Law
     Parameters:
-        f: Fraction of the program that is serial (0 <= f <= 1)
+        f: Fraction of the program that is parallel (0 <= f <= 1)
         p: Number of processors
 */
 double getAmdahlsLaw(double f, int p) {
@@ -48,7 +48,7 @@ double getAmdahlsLaw(double f, int p) {
     return (double)(1 / ((1 - f) + (f / p)));
 }
 
-/* Returns the fraction of the program that is serial using Amdah's Law 
+/* Returns the fraction of the program that is parallel using Amdah's Law 
     Parameters:
         T1: Execution time on one processor
         Tp: Execution time on p processors

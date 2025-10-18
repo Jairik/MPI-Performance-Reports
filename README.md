@@ -1,11 +1,25 @@
 # Performance Analysis on MPI Program using Amdahl's Law
 
-This program will aim to generate full autonomous performance analysis reports of the summation program (or any) using Amdahl's Law.
+Generates autonomous performance analysis reports of the summation program using Amdahl's Law.
+Expandable to analyze any MPI program with certain print outputs. Viewable via localhost web interface. 
 
-## Plan:
+## To run:
 
-- Run generate_plots.py with optional arguments (.c file name, defaulted to summation.c), then intake the number of cores to test (default = 1 (serial), 2, and 8), 
+```bash
+# Make and activate a python virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
+pip install uv  # Tool to install dependencies significantly faster
+uv pip install -r requirements.txt
+# Run the program
+python main.py
+```
 
-- Make an easy BASH script to automatically port forward to the HTML file & open it for easy viewing
+Then, the site should be viewable on `http://127.0.0.1:5000/`.
 
-- Will also need to probably make a PDF report with a little more description on everything maybe
+## Troubleshooting
+If there are errors regarding C shared libraries, run:
+```bash
+# from the folder containing algorithmslib.c
+gcc -O3 -fPIC -shared algorithmslib.c -o algorithmslib.so
+```

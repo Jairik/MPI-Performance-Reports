@@ -130,56 +130,105 @@ def load_c_library(lib_path: str = "algorithmslib.so") -> ctypes.CDLL:
 def get_general_admahls_plot(lib) -> go.Figure:
     ''' Generate a generalized plot for Amdahl's Law '''
     FP = np.array([0.5, 0.75, 0.9, 0.95])  # Fractions of the program that are parallelizable
-    P = np.array([5, 10, 100, 1000, 10000])  # Scenarios for number of processors
+
+    # Use logspace so that the processor counts scale smoothly from 1 → 10,000
+    P = np.logspace(0, 4, num=80, base=10).astype(int)  # Scenarios for number of processors (log scale)
     S_VALS = np.array([5, 10, 100, 1000, 10000])  # Speedup value scenarios to label
     COLOR_MAP = ['blue', 'orange', 'red', 'purple']  # Explicit color map for different speedup lines
     
     # Begin building the line graph plot
     fig = go.Figure()
     for i, f in enumerate(FP):
+        # Compute theoretical speedups based on Amdahl's Law for each processor count
         speedups = [lib.getAmdahlsLaw(float(f), int(p)) for p in P]
+
+        # Add a trace (line) for each parallel fraction fₚ
         fig.add_trace(go.Scatter(
-            x=P,  # fp on the x-axis
+            x=P,  # fp on the x-axis (number of processors)
             y=speedups,  # Calculated speedup on the y-axis
             mode='lines+markers',  # Add lines and markers at known points
             name=f'fₚ={f}',  # Label each line
             line=dict(width=2, color=COLOR_MAP[i % len(COLOR_MAP)]),  # Line width and color
             marker=dict(size=6, color=COLOR_MAP[i % len(COLOR_MAP)])  # Marker size and color
         ))
-        
+
     # Format the layout with title and axis titles
     fig.update_layout(
-        title='Amdahl\'s Law: Speedup vs Number of Processors (Theoretical)',
-        xaxis_title='Number of Processors (P)',
-        yaxis_title='Speedup (Sₚ)',
-        legend=dict(title='Parallel Fraction (fₚ)', x=0.01, y=0.99),
-        template='seaborn',  # Cool template
+        title="Amdahl's Law: Speedup vs Number of Processors (Theoretical)",
+        xaxis=dict(
+            title='Number of Processors (P)',
+            type='log',  # Use a logarithmic scale for P (1,10,100,1000,10000)
+            dtick=1,
+            showgrid=True,
+            gridcolor='rgba(255,255,255,0.08)',
+        ),
+        yaxis=dict(
+            title='Speedup (Sₚ)',
+            rangemode='tozero',
+            showgrid=True,
+            gridcolor='rgba(255,255,255,0.08)',
+        ),
+        legend=dict(
+            title='Parallel Fraction (fₚ)',
+            orientation='v',       # Vertical legend
+            x=1.02,               # Place to the right of the plotting area
+            xanchor='left',
+            y=1,
+            yanchor='top'
+        ),
+        template='plotly_dark',  # Cool template
+        margin=dict(l=60, r=120, t=60, b=50),  # Ensure space for the legend on the right and readable margins
+        hovermode='x unified',  # Unified hover label for better readability
+        uirevision='keep'       # Preserve zoom and pan state when refreshing
     )
-    
-    # Add y-tick labels for specific speedup values
+
+    # Add hover info for clarity
+    fig.update_traces(
+        hovertemplate='P=%{x}<br>Sₚ=%{y:.2f}<extra>%{fullData.name}</extra>'
+    )
+
+    # Add y-tick labels for specific speedup values (still optional)
     fig.update_yaxes(tickmode='array', tickvals=S_VALS, ticktext=[f"S{s}" for s in S_VALS])
 
     # Return the plot
     return fig
 
+
 def add_cur_theoretical_to_fig(lib, fig: go.Figure, fp: float) -> go.Figure:
-    ''' Add the current fP for the provided .c program to the theoretical Amdahl's Law plot '''
-    P = np.array([5, 10, 100, 1000, 10000])  # Scenarios for number of processors
-    S_VALS = np.array([5, 10, 100, 1000, 10000])  # Speedup value scenarios to label
-    COLOR = 'green'  # Color for the current fP line
+    ''' Add the current fₚ for the provided .c program to the theoretical Amdahl's Law plot '''
     
-    # Add a line to the current plot
+    # Use logspace so the processor counts scale smoothly from 1 → 10,000
+    P = np.logspace(0, 4, num=80, base=10).astype(int)  # Scenarios for number of processors (log scale)
+    S_VALS = np.array([5, 10, 100, 1000, 10000])  # Speedup value scenarios to label
+    COLOR = 'limegreen'  # Color for the current fₚ line
+    
+    # Calculate speedups
     speedups = [lib.getAmdahlsLaw(float(fp), int(p)) for p in P]  # Calculate the theoretical speedup values
+    
+    # Add a trace (line) for the current program's fₚ
     fig.add_trace(go.Scatter(
-        x=P,  # fp on the x-axis
+        x=P,  # fp on the x-axis (number of processors)
         y=speedups,  # Calculated speedup on the y-axis
-        name=f'Provided Program (fₚ={fp})',  # Label the line
+        name=f'Provided Program (fₚ={fp:.2f})',  # Label the line
         mode='lines+markers',  # Add lines and markers at known points
         line=dict(width=2, color=COLOR, dash='dash'),  # Line width and dashed style
         marker=dict(size=6, color=COLOR)  # Marker size and color
     ))
     
-    return fig    
+    # Improve hover clarity and scaling consistency with the main plot
+    fig.update_traces(
+        selector=dict(name=f'Provided Program (fₚ={fp:.2f})'),
+        hovertemplate='P=%{x}<br>Sₚ=%{y:.2f}<extra>%{fullData.name}</extra>'
+    )
+    
+    # Ensure axes and layout remain consistent after adding this trace
+    fig.update_layout(
+        xaxis=dict(type='log', dtick=1),  # Keep log scaling
+        uirevision='keep'  # Preserve zoom and pan state when refreshing
+    )
+    
+    return fig
+ 
 
 def get_num_cores() -> int:
     ''' Get the number of available CPU cores on the host machine '''

@@ -6,7 +6,7 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1" />
 	<title>MPI Performance Analysis</title>
 	<script src="https://cdn.tailwindcss.com"></script>  <!-- Include tailwind css -->
-	<script src="https://cdn.plot.ly/plotly-latest.min.js"></script> <!-- Include the plotly library -->
+	<script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script> <!-- Include the plotly library -->
 	<script>
 		tailwind.config = {
 			theme: {
@@ -27,7 +27,7 @@
 		<header class="border-b border-slate-800 pb-4">
 			<h1 class="text-3xl font-semibold text-white">MPI Performance Analysis</h1>
 			<p class="mt-1 text-sm text-muted italic">by JJ McCauley</p>
-			<p class="mt-1 text-sm text-muted text-center">Select the number of cores to test, then press "Update" to
+			<p class="mt-1 text-sm text-muted text-center">Select the number of cores to test and the argument to test, then press "Update" to
 				see the results.</p>
 		</header>
 
@@ -67,6 +67,7 @@
 		<section aria-labelledby="graph-heading"
 			class="rounded-2xl border border-panelBorder bg-panel/80 p-6 shadow-lg shadow-black/30">
 			<h2 id="graph-heading" class="text-xl font-semibold text-white">Graph</h2>
+			<p class="mt-1 text-sm text-muted">Interactive graph, hover over to pan/zoom/view.</p>
 			<div id="graph"
 				class="mt-4 min-h-[260px] overflow-auto rounded-xl border border-panelBorder bg-slate-900/60 p-4">
 				<!-- JS will fill in the graph here -->
@@ -88,7 +89,6 @@
 		// API endpoint configuration
 		const API = {
 			systemCores: '/api/cores',  // Available core counts as JSON
-			reportsGraph: '/api/graph',  // Performance graph as HTML
 			analysis: '/api/analysis',  // Analysis as JSON
 		};
 
@@ -102,6 +102,19 @@
 			analysis: document.getElementById('analysis'),
 			refresh: document.getElementById('refresh'),
 		};
+
+		// Helper to render the graph content inside a sandboxed iframe
+		function renderHtmlInIframe(container, html, heightPx = 520) {
+			const iframe = document.createElement('iframe');
+			iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
+			iframe.style.width = '100%';
+			iframe.style.height = `${heightPx}px`;
+			iframe.style.border = '0';
+			// Use srcdoc so the inline scripts inside the Plotly HTML run
+			iframe.srcdoc = `<!doctype html><html><head><meta charset="utf-8"></head><body>${html}</body></html>`;
+			container.innerHTML = '';
+			container.appendChild(iframe);
+		}
 
 		function setStatus(msg) {
 			elements.status.textContent = msg || '';
@@ -152,6 +165,12 @@
 				});
 			}
 
+			for (const def of defaults) {
+				if (seen.has(def)) continue;
+				seen.add(def);
+				normalized.push({ value: def, label: def });
+			}
+
 			for (const { value, label } of normalized) {
 				const checkboxId = `core-${value}`.replace(/[^a-z0-9_-]/gi, '-');
 				const wrapper = document.createElement('label');
@@ -198,27 +217,10 @@
 			}
 		}
 
-		// Load and display the graph from the API
-		async function loadGraph() {
-			const file = elements.filename.value.trim();
-			const cores = getSelectedCores();
-			elements.graph.innerHTML = '<p class="text-sm text-muted">Loading graph…</p>';
-			try {
-				const url = new URL(API.reportsGraph, window.location.origin);
-				if (file) url.searchParams.set('file', file);
-				if (cores.length) url.searchParams.set('cores', cores.join(','));
-				const res = await fetch(url.toString(), { headers: { 'Accept': 'text/html' } });
-				if (!res.ok) throw new Error(`Graph request failed: ${res.status}`);
-				const html = await res.text();
-				elements.graph.innerHTML = html || '<p class="muted">No graph returned.</p>';
-			} catch (e) {
-				elements.graph.innerHTML = '<p class="muted">Could not load graph. Ensure the reports/graph endpoint is available.</p>';
-			}
-		}
-
 		// Load analysis statements from the API
 		async function loadAnalysis() {
 			elements.analysis.innerHTML = '<p class="text-sm text-muted">Loading analysis…</p>';
+			elements.graph.innerHTML = '<p class="text-sm text-muted">Loading graph…</p>';
 
 			// small helpers
 			const toNumber = (v, d = 0) => (typeof v === 'number' ? v : Number(v ?? d));
@@ -229,11 +231,18 @@
 			};
 
 			try {
-				// gather inputs (the server may ignore them for now)
+				// Gather inputs from the form
 				const file = elements.filename.value.trim();
 				const args = elements.arguments.value.trim();
 				const cores = getSelectedCores().map(Number);
 
+				if (!cores.length) {
+					elements.analysis.innerHTML = '<p class="text-sm text-yellow-400">Please select at least one core configuration.</p>';
+					elements.graph.innerHTML = '<p class="text-sm text-yellow-400">Please select cores to generate graph.</p>';
+					return;
+				}
+
+				// Make the API call
 				const res = await fetch(API.analysis, {
 					method: 'POST',
 					headers: {
@@ -242,12 +251,25 @@
 					},
 					body: JSON.stringify({ filename: file, x: args, numP: cores })
 				});
-				if (!res.ok) throw new Error(`Analysis request failed: ${res.status}`);
+				
+				if (!res.ok) {
+					throw new Error(`Analysis request failed: ${res.status} ${res.statusText}`);
+				}
+				
 				const data = await res.json();
 
+				// Extract analyses array from response
 				const analyses = Array.isArray(data?.analyses) ? data.analyses : [];
+				
 				if (!analyses.length) {
 					elements.analysis.innerHTML = '<p class="text-sm text-muted">No analysis results returned.</p>';
+					// Try to render graph even if no analyses
+					const graphHtml = data?.graph ?? '';
+					if (graphHtml && String(graphHtml).trim()) {
+						renderHtmlInIframe(elements.graph, graphHtml, 520);
+					} else {
+						elements.graph.innerHTML = '<p class="text-sm text-muted">No graph returned.</p>';
+					}
 					return;
 				}
 
@@ -335,20 +357,25 @@
 				// Replace analysis contents
 				elements.analysis.replaceChildren(wrapper);
 
-				// Update the main graph with the last run's returned graph (if present)
+				// Update the main graph with the response graph content
 				const last = analyses[analyses.length - 1];
-				//if (last?.graph) {
-				//	elements.graph.innerHTML = last.graph;
-				//}
+				const graphHtml = data?.graph ?? last?.graph ?? '';
+				if (graphHtml && String(graphHtml).trim()) {
+					renderHtmlInIframe(elements.graph, graphHtml, 520);
+				} else {
+					elements.graph.innerHTML = '<p class="text-sm text-muted">No graph returned.</p>';
+				}
 			} catch (e) {
+				console.error('Analysis error:', e);
 				elements.analysis.innerHTML = `<p class="text-sm text-red-400">Could not load analysis: ${e.message}</p>`;
+				elements.graph.innerHTML = '<p class="text-sm text-red-400">Graph unavailable due to error.</p>';
 			}
 		}
 
 		// Helper to refresh all the data from all elements
 		async function refreshAll() {
 			setStatus('Updating…');
-			await Promise.allSettled([loadGraph(), loadAnalysis()]);
+			await Promise.allSettled([loadAnalysis()]);
 			setStatus('');
 		}
 
