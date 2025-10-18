@@ -1,5 +1,6 @@
 ''' Helper functions for performance analysis '''
 
+from pathlib import Path
 import subprocess
 import os
 import ctypes
@@ -65,12 +66,14 @@ def add_all_stats_to_results(lib, results: dict, np: int, serial_time: float = N
     # If this is for the serial process (no serial_time passed), we can skip calculations
     if serial_time:
         # Derive max parallel time
-        parallel_times = [time for key, time in results.items() if isinstance(key, int) or key.startswith('rank ')]  # Get all parallel execution times
-        max_parallel_time = max(parallel_times) if parallel_times else 0.0  # Use the maximum parallel time
+        parallel_times: list = [time for key, time in results.items() if isinstance(key, int) or key.startswith('rank ')]  # Get all parallel execution times
+        max_parallel_time: float = max(parallel_times) if parallel_times else 0.0  # Use the max parallel time
         # Use helper function from C algorithms library to derive speedup, efficiency, and fraction parallelizable
-        results['speedup'] = float(lib.getSpeedup(serial_time, max_parallel_time)).round(5)
-        results['efficiency'] = float(lib.getEfficiency(results['speedup'], np)).round(5)
-        results['fp'] = float(lib.getFractionParallelizable(serial_time, max_parallel_time, np)).round(5)
+        results['speedup'] = float(lib.getSpeedup(serial_time, max_parallel_time))
+        results['efficiency'] = float(lib.getEfficiency(results['speedup'], np))
+        fp: float = float(lib.getFractionParallelizable(serial_time, max_parallel_time, np))
+        results['fp'] = fp
+        results['fs'] = float(1.0 - fp)
     # On first iteration for serial execution, we can skip calculations and set speedup and efficiency to 1
     else:
         results['speedup'] = 1.0  # Speedup is 1 for serial execution
@@ -79,7 +82,11 @@ def add_all_stats_to_results(lib, results: dict, np: int, serial_time: float = N
 
 def load_c_library(lib_path: str = "algorithmslib.so") -> ctypes.CDLL:
     ''' Load the C shared library for performance calculations '''
-    lib = ctypes.CDLL(lib_path)
+    # Get the path to the shared library
+    here = Path(__file__).resolve().parent
+    lib_path1 = here / lib_path
+    # Load the shared library
+    lib = ctypes.CDLL(str(lib_path1))
     # Declaring argument types
     lib.getSpeedup.argtypes = [ctypes.c_double, ctypes.c_double]
     lib.getEfficiency.argtypes = [ctypes.c_double, ctypes.c_int]
@@ -101,15 +108,15 @@ def get_general_admahls_plot(lib) -> go.Figure:
     
     # Begin building the line graph plot
     fig = go.Figure()
-    for f in FP:
+    for i, f in enumerate(FP):
         speedups = [lib.getAmdahlsLaw(f, p) for p in P]
         fig.add_trace(go.Scatter(
             x=P,  # fp on the x-axis
             y=speedups,  # Calculated speedup on the y-axis
             mode='lines+markers',  # Add lines and markers at known points
             name=f'fₚ={f}',  # Label each line
-            line=dict(width=2, color=COLOR_MAP[f]),  # Line width and color
-            marker=dict(size=6, color=COLOR_MAP[f])  # Marker size and color
+            line=dict(width=2, color=COLOR_MAP[i % len(COLOR_MAP)]),  # Line width and color
+            marker=dict(size=6, color=COLOR_MAP[i % len(COLOR_MAP)])  # Marker size and color
         ))
         
     # Format the layout with title and axis titles
@@ -122,7 +129,7 @@ def get_general_admahls_plot(lib) -> go.Figure:
     )
     
     # Add y-tick labels for specific speedup values
-    fig.update_yaxes(tickmode='array', tickvals=S_VALS, ticktext=[str("S", s) for s in S_VALS])
+    fig.update_yaxes(tickmode='array', tickvals=S_VALS, ticktext=[f"S{s}" for s in S_VALS])
 
     # Return the plot
     return fig

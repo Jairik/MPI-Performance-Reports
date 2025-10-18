@@ -4,87 +4,66 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<title>MPI Performance Analysis</title>
-		<!-- Minimal CSS library: Pico.css -->
-		<link
-			rel="stylesheet"
-			href="https://unpkg.com/@picocss/pico@2/css/pico.min.css"
-		/>
-		<style>
-			/* Tiny tweaks to keep things neat */
-			.subheader { color: var(--muted-color); margin-top: -0.75rem; }
-			.panel { padding: 1rem; border: 1px solid var(--muted-border-color); border-radius: 0.5rem; background: var(--card-background-color); }
-			#graph { min-height: 260px; overflow: auto; }
-			.grid-tight { gap: 0.75rem; }
-			.questions section + section { margin-top: 1rem; }
-			.muted { color: var(--muted-color); }
-			.inline-help { font-size: 0.9rem; }
-		</style>
+		<script src="https://cdn.tailwindcss.com"></script>
+		<script>
+			tailwind.config = {
+				theme: {
+					extend: {
+						colors: {
+							panel: '#111827',
+							panelBorder: '#1f2937',
+							muted: '#9ca3af',
+						}
+					}
+				}
+			};
+		</script>
 	</head>
-	<body>
-		<main class="container">
-			<header style="margin-top: 1.25rem; margin-bottom: 1.25rem;">
-				<h1 style="margin-bottom: 0.25rem;">MPI Performance Analysis</h1>
-				<p class="subheader">by JJ McCauley</p>
+	<body class="min-h-screen bg-slate-950 text-slate-50">
+		<main class="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8">
+			<header class="border-b border-slate-800 pb-4">
+				<h1 class="text-3xl font-semibold text-white">MPI Performance Analysis</h1>
+				<p class="mt-1 text-sm text-muted italic">by JJ McCauley</p>
+				<p class="mt-1 text-sm text-muted text-center">Select the number of cores to test, then press "Update" to see the results.</p>
 			</header>
 
-			<section aria-labelledby="inputs-heading" class="panel" style="margin-bottom: 1rem;">
-				<h2 id="inputs-heading" style="margin-bottom: 0.75rem;">Inputs</h2>
-				<div class="grid grid-tight">
-					<div>
-						<label for="filename"><strong>C source file</strong></label>
-						<input id="filename" name="filename" type="text" value="summation.c" placeholder="e.g. summation.c" />
-						<small class="muted inline-help">Provide a .c filename to analyze.</small>
+			<section aria-labelledby="inputs-heading" class="rounded-2xl border border-panelBorder bg-panel/80 p-6 shadow-lg shadow-black/30">
+				<div class="flex items-center justify-between gap-4">
+					<h2 id="inputs-heading" class="text-xl font-semibold text-white">Inputs</h2>
+					<button id="refresh" class="inline-flex items-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300">
+						<span>Analyze</span>
+					</button>
+				</div>
+				<div class="mt-4 grid gap-5 md:grid-cols-2 md:items-end">
+					<div class="flex flex-col gap-2">
+						<label for="filename" class="text-sm font-medium text-slate-200">C source file</label>
+						<input id="filename" name="filename" type="text" value="summation.c" placeholder="e.g. summation.c" class="w-full rounded-lg border border-panelBorder bg-slate-900/60 px-3 py-2 text-sm text-white placeholder:text-muted focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-500/50" />
+						<p class="text-xs text-muted">Provide a .c filename to analyze.</p>
 					</div>
-					<div>
-						<label for="cores"><strong>Number of cores</strong></label>
-						<select id="cores" name="cores" multiple size="5" aria-describedby="cores-help">
+					<div class="flex flex-col gap-2">
+						<label for="cores" class="text-sm font-medium text-slate-200">Number of cores</label>
+						<select id="cores" name="cores" multiple size="5" aria-describedby="cores-help" class="h-32 w-full rounded-lg border border-panelBorder bg-slate-900/60 px-3 py-2 text-sm text-white focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-500/50">
 							<option disabled>Loading core options…</option>
 						</select>
-						<small id="cores-help" class="muted inline-help">Select one or more (Ctrl/Cmd or Shift-click).</small>
+						<p id="cores-help" class="text-xs text-muted">Select one or more (Ctrl/Cmd or Shift-click).</p>
 					</div>
 				</div>
-				<div style="margin-top: 0.75rem; display: flex; gap: 0.5rem;">
-					<button id="refresh">Update</button>
-					<span id="status" class="muted" role="status" aria-live="polite"></span>
+				<span id="status" class="mt-4 inline-block text-sm text-muted" role="status" aria-live="polite"></span>
+			</section>
+
+			<section aria-labelledby="graph-heading" class="rounded-2xl border border-panelBorder bg-panel/80 p-6 shadow-lg shadow-black/30">
+				<h2 id="graph-heading" class="text-xl font-semibold text-white">Graph</h2>
+				<div id="graph" class="mt-4 min-h-[260px] overflow-auto rounded-xl border border-panelBorder bg-slate-900/60 p-4">
+					<!-- JS will fill in the graph here -->
+					<p class="text-sm text-muted">Waiting for data…</p>
 				</div>
 			</section>
 
-			<section aria-labelledby="graph-heading" class="panel" style="margin-bottom: 1rem;">
-				<h2 id="graph-heading" style="margin-bottom: 0.75rem;">Graph</h2>
-				<div id="graph" class="panel" style="margin: 0;">
-                    <!-- JS will fill in the graph here -->
-					<p class="muted">Waiting for data…</p>
-				</div>
-			</section>
-
-			<section aria-labelledby="questions-heading" class="panel">
-				<h2 id="questions-heading" style="margin-bottom: 0.75rem;">Analysis</h2>
-				<div class="questions">
-                <!-- This will all be dynamically populated with js, received from endpoints-->
-                    <section>
-						<h3>Question 1</h3>
-						<div id="q1" class="panel" style="margin: 0;">
-							<p class="muted">Waiting for answer…</p>
-						</div>
-					</section>
-					<section>
-						<h3>Question 2</h3>
-						<div id="q2" class="panel" style="margin: 0;">
-							<p class="muted">Waiting for answer…</p>
-						</div>
-					</section>
-					<section>
-						<h3>Question 3</h3>
-						<div id="q3" class="panel" style="margin: 0;">
-							<p class="muted">Waiting for answer…</p>
-						</div>
-					</section>
-					<section>
-						<h3>Question 4</h3>
-						<div id="q4" class="panel" style="margin: 0;">
-							<p class="muted">Waiting for answer…</p>
-						</div>
-					</section>
+			<section aria-labelledby="analysis-heading" class="rounded-2xl border border-panelBorder bg-panel/80 p-6 shadow-lg shadow-black/30">
+				<h2 id="analysis-heading" class="text-xl font-semibold text-white">Analysis</h2>
+				<!-- Single container that will be populated dynamically by JavaScript -->
+				<div id="analysis" class="mt-4 min-h-[160px] rounded-xl border border-panelBorder bg-slate-900/60 p-4">
+					<p class="text-sm text-muted">Waiting for analysis…</p>
 				</div>
 			</section>
 		</main>
@@ -92,21 +71,18 @@
 		<script>
 			// API endpoint configuration
 			const API = {
-				cores: '/api/cores', // Number of available cores on the host computer
-				graph: '/api/graph', // Pure HTML embedding of graph
-				questions: '/api/analysis',  // Analysis stats for each core
+				systemCores: '/api/cores',  // Available core counts as JSON
+				reportsGraph: '/api/graph',  // Performance graph as HTML
+				analysis: '/api/analysis',  // Analysis as JSON
 			};
 
-            // Hold all elemnts in a list for easy reference
+			// Hold all elements in a list for easy reference
 			const elements = {
 				filename: document.getElementById('filename'),
 				cores: document.getElementById('cores'),
 				graph: document.getElementById('graph'),
 				status: document.getElementById('status'),
-				q1: document.getElementById('q1'),
-				q2: document.getElementById('q2'),
-				q3: document.getElementById('q3'),
-				q4: document.getElementById('q4'),
+				analysis: document.getElementById('analysis'),
 				refresh: document.getElementById('refresh'),
 			};
 
@@ -114,19 +90,19 @@
 				elements.status.textContent = msg || '';
 			}
 
-            // Helper to fetch JSON data from an endpoint
+			// Helper to fetch JSON data from an endpoint
 			async function fetchJSON(url) {
 				const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
 				if (!res.ok) throw new Error(`Request failed: ${res.status}`);
 				return await res.json();
 			}
 
-            // Get selected core values from the select element
+			// Get selected core values from the select element
 			function getSelectedCores() {
 				return Array.from(elements.cores.selectedOptions).map(o => o.value).filter(Boolean);
 			}
 
-            // Populate the cores select element with options
+			// Populate the cores select element with options
 			function populateCoresSelect(values) {
 				elements.cores.innerHTML = '';
 				if (!values || !values.length) {
@@ -136,23 +112,18 @@
 					return;
 				}
 				for (const v of values) {
-					let value = v;
-					let label = String(v);
-					if (typeof v === 'object' && v !== null) {
-						value = v.value ?? v.id ?? v.cores ?? v.name ?? v;
-						label = v.label ?? String(value);
-					}
+					let value = String(v.cores);
 					const opt = document.createElement('option');
 					opt.value = String(value);
-					opt.textContent = String(label);
+					opt.textContent = String(value);
 					elements.cores.appendChild(opt);
 				}
 			}
 
-            // Load available core options from the API
+			// Load available core options from the API
 			async function loadCores() {
 				try {
-					const data = await fetchJSON(API.cores);
+					const data = await fetchJSON(API.systemCores);
 					const values = Array.isArray(data) ? data : (Array.isArray(data.options) ? data.options : []);
 					populateCoresSelect(values);
 				} catch (e) {
@@ -162,13 +133,13 @@
 				}
 			}
 
-            // Load and display the graph from the API
+			// Load and display the graph from the API
 			async function loadGraph() {
 				const file = elements.filename.value.trim();
 				const cores = getSelectedCores();
 				elements.graph.innerHTML = '<p class="muted">Loading graph…</p>';
 				try {
-					const url = new URL(API.graph, window.location.origin);
+					const url = new URL(API.reportsGraph, window.location.origin);
 					if (file) url.searchParams.set('file', file);
 					if (cores.length) url.searchParams.set('cores', cores.join(','));
 					const res = await fetch(url.toString(), { headers: { 'Accept': 'text/html' } });
@@ -176,65 +147,22 @@
 					const html = await res.text();
 					elements.graph.innerHTML = html || '<p class="muted">No graph returned.</p>';
 				} catch (e) {
-					elements.graph.innerHTML = '<p class="muted">Could not load graph. Ensure the graph endpoint is available.</p>';
+					elements.graph.innerHTML = '<p class="muted">Could not load graph. Ensure the reports/graph endpoint is available.</p>';
 				}
 			}
 
-            // Set the inner html of the stats portion for each core configuration
-			function setStat(el, html) {
-				el.innerHTML = html && String(html).trim() ? html : '<p class="muted">No answer provided.</p>';
-			}
-
-			function extractQuestionsPayload(data) {
-				// Possible supported shapes:
-				// 1) { questions: [html1, html2, html3, html4] }
-				// 2) { questions: [{title?, content|html}, ...] }
-				// 3) { q1: html, q2: html, q3: html, q4: html }
-				// 4) [html1, html2, html3, html4]
-				let arr = [];
-				if (Array.isArray(data)) arr = data;
-				elements if (Array.isArray(data?.questions)) arr = data.questions;
-				elements if (data && (data.q1 || data.q2 || data.q3 || data.q4)) {
-					arr = [data.q1, data.q2, data.q3, data.q4];
-				}
-				// Normalize to HTML strings
-				return arr.map(item => {
-					if (item && typeof item === 'object') return item.content ?? item.html ?? '';
-					return item ?? '';
-				});
-			}
-
-            // Load analysis statements from the API
+			// Load analysis statements from the API
 			async function loadAnalysis() {
-				const file = elements.filename.value.trim();
-				const cores = getSelectedCores();
-				setStat(elements.q1, '<p class="muted">Loading…</p>');
-				setStat(elements.q2, '<p class="muted">Loading…</p>');
-				setStat(elements.q3, '<p class="muted">Loading…</p>');
-				setStat(elements.q4, '<p class="muted">Loading…</p>');
-				try {
-					const url = new URL(API.questions, window.location.origin);
-					if (file) url.searchParams.set('file', file);
-					if (cores.length) url.searchParams.set('cores', cores.join(','));
-					const data = await fetchJSON(url.toString());
-					const q = extractQuestionsPayload(data);
-					setStat(elements.q1, q[0]);
-					setStat(elements.q2, q[1]);
-					setStat(elements.q3, q[2]);
-					setStat(elements.q4, q[3]);
-				} catch (e) {
-					const fallback = '<p class="muted">Could not load answer. Ensure the questions endpoint is available.</p>';
-					setStat(elements.q1, fallback);
-					setStat(elements.q2, fallback);
-					setStat(elements.q3, fallback);
-					setStat(elements.q4, fallback);
-				}
+				elements.analysis.innerHTML = '<p class="muted">Loading analysis…</p>';
+				// NOTE: Looking at this now, it is not at all optimal. However it is good enough for now.
+				
+				// TODO: fetch analysis payload from API.analysis and render it into `elements.analysis`.
 			}
 
-            // Helper to refresh all the data from all elements
+			// Helper to refresh all the data from all elements
 			async function refreshAll() {
 				setStatus('Updating…');
-				await Promise.allSettled([loadGraph(), loadQuestions()]);
+				await Promise.allSettled([loadGraph(), loadAnalysis()]);
 				setStatus('');
 			}
 
