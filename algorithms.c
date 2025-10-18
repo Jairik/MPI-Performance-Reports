@@ -45,7 +45,7 @@ double getAmdahlsLaw(double f, int p) {
         return 0;
     }
     // Return the result of the formula
-    return (double)(1 / ((1 - f) / (f / p)));
+    return (double)(1 / ((1 - f) + (f / p)));
 }
 
 /* Returns the fraction of the program that is serial using Amdah's Law 

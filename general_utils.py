@@ -11,16 +11,17 @@ executable: str = str('summation')  # Default value, make sure python knows that
 
 def compile_mpi_program(filename: str = 'summation.c') -> None:
     ''' Attempt to compile the globally defined MPI C program using mpicc '''
-    executable: str = filename.replace('.c', '')  # Derive executable name from filename
+    global executable  # Use the global executable variable, not the local one
+    executable = filename.replace('.c', '')  # Derive executable name from filename
     try:
         subprocess.run(['mpicc', filename, '-o', executable], check=True)
     except subprocess.CalledProcessError as e:
         print(f"Compilation failed: {e}")
         exit(1)
 
-def run_executable(lib, x: int = 10000000, np: int = 4) -> str:
+def run_executable(lib, x: int = 50000, np: int = 4) -> str:
     ''' Attempt to run the globally defined executable using mpirun with a specified number of processes and x parameter '''
-    cmd = ["mpirun", "--oversubscribe", "-np", str(np), "./summation", str(x)]
+    cmd = ["mpirun", '--use-hwthread-cpus', "-np", str(np), f"./{executable}", str(x)]
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
     except subprocess.CalledProcessError as e:
@@ -39,29 +40,25 @@ def parse_execution_output(lib, output: str, np: int, serial_time: float = None)
     lines: list[str] = output.strip().split('\n')  # Split output into lines
     results: dict = {}  # Initialize results dictionary
     for line in lines:
+        line = line.lower()
         # Extract run time values
-        if "run time" in line:
+        if "time" in line:
             # Extract per-core information for parallel programs
-            if "MPI" in line:
+            if "mpi" in line:
                 parts = line.split()  # Split line into parts by spaces
                 rank = int(parts[5])  # Extract rank number, which should be at index 5
                 time = float(parts[-1])  # Extract time value, which should be last
                 results[f'rank {rank}'] = time  # Store in dictionary with rank as key
             # Extract serial information by seperate key
-            elif "Serial" in line:
+            elif "serial" in line:
                 parts = line.split()  # Split line into parts by spaces
                 time = float(parts[-1])  # Extract time value, which should be last
                 results['serial'] = time  # Store in dictionary with 'serial' as key
         # Extract total summation value
-        elif "Summation" in line:
+        elif "summation" in line:
             parts = line.split()  # Split line into parts by spaces
             total = int(parts[-1])  # Extract total summation value, which should be last
             results['total'] = total  # Store in dictionary with 'total' as key
-        # Extract the benchmarked fraction of parallelizable code value
-        elif "Fraction of Parallel" in line:
-            parts = line.split()  # Split line into parts by spaces
-            fp = float(parts[-1]).round(5)  # Extract fraction value, which should be last
-            results['fp'] = fp  # Store in dictionary with 'fp' as key
     
     add_all_stats_to_results(lib, results, np, serial_time)  # Add speedup, efficiency, and fraction parallel/serial to results (apply directly by reference)
     
@@ -70,22 +67,46 @@ def parse_execution_output(lib, output: str, np: int, serial_time: float = None)
 
 def add_all_stats_to_results(lib, results: dict, np: int, serial_time: float = None) -> None:
     ''' Derive the fraction of parallelizable code, speedup, and efficiency from the execution results '''
-    # If this is for the serial process (no serial_time passed), we can skip calculations
-    if serial_time:
-        # Derive max parallel time
-        parallel_times: list = [time for key, time in results.items() if isinstance(key, int) or key.startswith('rank ')]  # Get all parallel execution times
-        max_parallel_time: float = max(parallel_times) if parallel_times else 0.0  # Use the max parallel time
-        # Use helper function from C algorithms library to derive speedup, efficiency, and fraction parallelizable
-        results['speedup'] = float(lib.getSpeedup(serial_time, max_parallel_time))
-        results['efficiency'] = float(lib.getEfficiency(results['speedup'], np))
-        fp: float = float(lib.getFractionParallelizable(serial_time, max_parallel_time, np))
-        results['fp'] = fp
-        results['fs'] = float(1.0 - fp)
-    # On first iteration for serial execution, we can skip calculations and set speedup and efficiency to 1
-    else:
-        results['speedup'] = 1.0  # Speedup is 1 for serial execution
-        results['efficiency'] = 1.0  # Efficiency is 1 for serial
-        results['fp'] = 0.0
+    # First (serial) pass reports serial metrics only
+    if serial_time is None:
+        results.setdefault("speedup", 1.0)
+        results.setdefault("efficiency", 1.0)
+        results.setdefault("fp", 0.0)
+        results["fs"] = round(1.0 - results["fp"], 6)
+        return
+
+    # Collect per-rank times
+    parallel_times = [
+        v for k, v in results.items()
+        if (isinstance(k, str) and k.lower().startswith("rank")) and isinstance(v, (int, float))
+    ]
+    # Fallback if nothing parsed for ranks add default values
+    if not parallel_times:
+        results["speedup"] = 1.0
+        results["efficiency"] = 1.0
+        results["fp"] = 0.0
+        results["fs"] = 1.0
+        return
+
+    Tp = max(parallel_times)  # Get the maximum parallel time across all ranks
+    # Fallback
+    if Tp <= 0:
+        results["speedup"] = 1.0
+        results["efficiency"] = 1.0
+        results["fp"] = 0.0
+        results["fs"] = 1.0
+        return
+
+    # Calculate speedup, efficiency, and fraction parallelizable using the defined C library functions
+    S = float(lib.getSpeedup(float(serial_time), float(Tp)))
+    E = float(lib.getEfficiency(S, int(np)))
+    fp = float(lib.getFractionParallelizable(float(serial_time), float(Tp), int(np)))
+
+    # Assign rounded values to results dictionary
+    results["speedup"] = round(S, 6)
+    results["efficiency"] = round(E, 6)
+    results["fp"] = round(max(0.0, min(1.0, fp)), 6)
+    results["fs"] = round(1.0 - results["fp"], 6)
 
 def load_c_library(lib_path: str = "algorithmslib.so") -> ctypes.CDLL:
     ''' Load the C shared library for performance calculations '''
@@ -97,7 +118,7 @@ def load_c_library(lib_path: str = "algorithmslib.so") -> ctypes.CDLL:
     # Declaring argument types
     lib.getSpeedup.argtypes = [ctypes.c_double, ctypes.c_double]
     lib.getEfficiency.argtypes = [ctypes.c_double, ctypes.c_int]
-    lib.getAmdahlsLaw.argtypes = [ctypes.c_double, ctypes.c_double]
+    lib.getAmdahlsLaw.argtypes = [ctypes.c_double, ctypes.c_int]
     lib.getFractionParallelizable.argtypes = [ctypes.c_double, ctypes.c_double, ctypes.c_int]
     # Declaring the return types
     lib.getSpeedup.restype = ctypes.c_double
@@ -116,7 +137,7 @@ def get_general_admahls_plot(lib) -> go.Figure:
     # Begin building the line graph plot
     fig = go.Figure()
     for i, f in enumerate(FP):
-        speedups = [lib.getAmdahlsLaw(f, p) for p in P]
+        speedups = [lib.getAmdahlsLaw(float(f), int(p)) for p in P]
         fig.add_trace(go.Scatter(
             x=P,  # fp on the x-axis
             y=speedups,  # Calculated speedup on the y-axis
@@ -148,7 +169,7 @@ def add_cur_theoretical_to_fig(lib, fig: go.Figure, fp: float) -> go.Figure:
     COLOR = 'green'  # Color for the current fP line
     
     # Add a line to the current plot
-    speedups = [lib.getAmdahlsLaw(fp, p) for p in P]  # Calculate the theoretical speedup values
+    speedups = [lib.getAmdahlsLaw(float(fp), int(p)) for p in P]  # Calculate the theoretical speedup values
     fig.add_trace(go.Scatter(
         x=P,  # fp on the x-axis
         y=speedups,  # Calculated speedup on the y-axis
@@ -163,5 +184,5 @@ def add_cur_theoretical_to_fig(lib, fig: go.Figure, fp: float) -> go.Figure:
 def get_num_cores() -> int:
     ''' Get the number of available CPU cores on the host machine '''
     cpu_count = os.cpu_count()
-    return cpu_count if cpu_count is not None else 1  # Fallback to 1 if cpu_count() returns None
+    return cpu_count if cpu_count is not None else 8  # Default to 8 cores if undetectable
 

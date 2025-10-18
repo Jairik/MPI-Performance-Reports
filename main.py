@@ -33,15 +33,16 @@ def get_cores() -> dict:
 def get_graph() -> Response:
     ''' Get the HTML embedding of the Amdahl's Law graph and return as pure HTML '''
     fig = gp.get_general_admahls_plot(lib)
-    html_graph = fig.to_html(full_html=False)  # Convert the plot to HTML format
+    html_graph = fig.to_html(full_html=False, include_plotlyjs='cdn')  # Convert the plot to HTML format
     return Response(html_graph, mimetype='text/html')  # Return as HTML response
 
 @app.post('/api/analysis')
-def get_analysis(filename: str = 'summation.c', x: int = 10000000, numP: list[int] = [1, 2, 8]) -> dict:
+def get_analysis(filename: str = 'summation.c', x: int = 1000000000, numP: list[int] = [1, 2, 8]) -> dict:
     ''' Get analysis stats execution on each core '''
     gp.compile_mpi_program(filename)  # Try to compile the provided MPI C program
     response: dict = {}  # Initialize response dictionary
     serial_runtime: float = None  # Initialize serial runtime variable
+    print(f"DEBUGGING: numP before processing: {numP}")  # Debug: print the initial numP list
     # Ensure 1 is the first element of numP (move it if present, or add it if missing)
     if 1 in numP:
         numP = [1] + [p for p in numP if p != 1]
@@ -51,8 +52,8 @@ def get_analysis(filename: str = 'summation.c', x: int = 10000000, numP: list[in
     for np in numP:
         result = gp.run_executable(lib, x, np)  # Run the compiled executable
         analysis_results: dict = gp.parse_execution_output(lib=lib, output=result, np=np, serial_time=serial_runtime)  # Parse the output into a dictionary
-        # Store the serial runtime for reference
-        if np == 1:
+        print(f"Analysis results for {np} processes: {analysis_results}")  # Debug: print the analysis results
+        if np == 1:  # Store the serial runtime for reference
             serial_runtime = analysis_results.get('serial', None)  # Store the serial runtime
         fig = gp.get_general_admahls_plot(lib)  # Get the general Amdahl's Law plot
         updated_fig = gp.add_cur_theoretical_to_fig(lib, fig, analysis_results['fp'])  # Add the analysis point to the plot
