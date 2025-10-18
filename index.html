@@ -1,185 +1,316 @@
 <!doctype html>
 <html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<title>MPI Performance Analysis</title>
-		<script src="https://cdn.tailwindcss.com"></script>
-		<script>
-			tailwind.config = {
-				theme: {
-					extend: {
-						colors: {
-							panel: '#111827',
-							panelBorder: '#1f2937',
-							muted: '#9ca3af',
-						}
+
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>MPI Performance Analysis</title>
+	<script src="https://cdn.tailwindcss.com"></script>
+	<script>
+		tailwind.config = {
+			theme: {
+				extend: {
+					colors: {
+						panel: '#111827',
+						panelBorder: '#1f2937',
+						muted: '#9ca3af',
 					}
 				}
-			};
-		</script>
-	</head>
-	<body class="min-h-screen bg-slate-950 text-slate-50">
-		<main class="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8">
-			<header class="border-b border-slate-800 pb-4">
-				<h1 class="text-3xl font-semibold text-white">MPI Performance Analysis</h1>
-				<p class="mt-1 text-sm text-muted italic">by JJ McCauley</p>
-				<p class="mt-1 text-sm text-muted text-center">Select the number of cores to test, then press "Update" to see the results.</p>
-			</header>
-
-			<section aria-labelledby="inputs-heading" class="rounded-2xl border border-panelBorder bg-panel/80 p-6 shadow-lg shadow-black/30">
-				<div class="flex items-center justify-between gap-4">
-					<h2 id="inputs-heading" class="text-xl font-semibold text-white">Inputs</h2>
-					<button id="refresh" class="inline-flex items-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300">
-						<span>Analyze</span>
-					</button>
-				</div>
-				<div class="mt-4 grid gap-5 md:grid-cols-2 md:items-end">
-					<div class="flex flex-col gap-2">
-						<label for="filename" class="text-sm font-medium text-slate-200">C source file</label>
-						<input id="filename" name="filename" type="text" value="summation.c" placeholder="e.g. summation.c" class="w-full rounded-lg border border-panelBorder bg-slate-900/60 px-3 py-2 text-sm text-white placeholder:text-muted focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-500/50" />
-						<p class="text-xs text-muted">Provide a .c filename to analyze.</p>
-					</div>
-					<div class="flex flex-col gap-2">
-						<label for="cores" class="text-sm font-medium text-slate-200">Number of cores</label>
-						<select id="cores" name="cores" multiple size="5" aria-describedby="cores-help" class="h-32 w-full rounded-lg border border-panelBorder bg-slate-900/60 px-3 py-2 text-sm text-white focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-500/50">
-							<option disabled>Loading core options…</option>
-						</select>
-						<p id="cores-help" class="text-xs text-muted">Select one or more (Ctrl/Cmd or Shift-click).</p>
-					</div>
-				</div>
-				<span id="status" class="mt-4 inline-block text-sm text-muted" role="status" aria-live="polite"></span>
-			</section>
-
-			<section aria-labelledby="graph-heading" class="rounded-2xl border border-panelBorder bg-panel/80 p-6 shadow-lg shadow-black/30">
-				<h2 id="graph-heading" class="text-xl font-semibold text-white">Graph</h2>
-				<div id="graph" class="mt-4 min-h-[260px] overflow-auto rounded-xl border border-panelBorder bg-slate-900/60 p-4">
-					<!-- JS will fill in the graph here -->
-					<p class="text-sm text-muted">Waiting for data…</p>
-				</div>
-			</section>
-
-			<section aria-labelledby="analysis-heading" class="rounded-2xl border border-panelBorder bg-panel/80 p-6 shadow-lg shadow-black/30">
-				<h2 id="analysis-heading" class="text-xl font-semibold text-white">Analysis</h2>
-				<!-- Single container that will be populated dynamically by JavaScript -->
-				<div id="analysis" class="mt-4 min-h-[160px] rounded-xl border border-panelBorder bg-slate-900/60 p-4">
-					<p class="text-sm text-muted">Waiting for analysis…</p>
-				</div>
-			</section>
-		</main>
-
-		<script>
-			// API endpoint configuration
-			const API = {
-				systemCores: '/api/cores',  // Available core counts as JSON
-				reportsGraph: '/api/graph',  // Performance graph as HTML
-				analysis: '/api/analysis',  // Analysis as JSON
-			};
-
-			// Hold all elements in a list for easy reference
-			const elements = {
-				filename: document.getElementById('filename'),
-				cores: document.getElementById('cores'),
-				graph: document.getElementById('graph'),
-				status: document.getElementById('status'),
-				analysis: document.getElementById('analysis'),
-				refresh: document.getElementById('refresh'),
-			};
-
-			function setStatus(msg) {
-				elements.status.textContent = msg || '';
 			}
+		};
+	</script>
+</head>
 
-			// Helper to fetch JSON data from an endpoint
-			async function fetchJSON(url) {
-				const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
-				if (!res.ok) throw new Error(`Request failed: ${res.status}`);
-				return await res.json();
+<body class="min-h-screen bg-slate-950 text-slate-50">
+	<main class="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8">
+		<header class="border-b border-slate-800 pb-4">
+			<h1 class="text-3xl font-semibold text-white">MPI Performance Analysis</h1>
+			<p class="mt-1 text-sm text-muted italic">by JJ McCauley</p>
+			<p class="mt-1 text-sm text-muted text-center">Select the number of cores to test, then press "Update" to
+				see the results.</p>
+		</header>
+
+		<section aria-labelledby="inputs-heading"
+			class="rounded-2xl border border-panelBorder bg-panel/80 p-6 shadow-lg shadow-black/30">
+			<div class="flex items-center justify-between gap-4">
+				<h2 id="inputs-heading" class="text-xl font-semibold text-white">Inputs</h2>
+				<button id="refresh"
+					class="inline-flex items-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300">
+					<span>Analyze</span>
+				</button>
+			</div>
+			<div class="mt-4 grid gap-5 md:grid-cols-2 md:items-end">
+				<div class="flex flex-col gap-2">
+					<label for="filename" class="text-sm font-medium text-slate-200">C source file</label>
+					<input id="filename" name="filename" type="text" value="summation.c" placeholder="e.g. summation.c"
+						class="w-full rounded-lg border border-panelBorder bg-slate-900/60 px-3 py-2 text-sm text-white placeholder:text-muted focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-500/50" />
+					<p class="text-xs text-muted">Provide a .c filename to analyze.</p>
+				</div>
+				<div class="flex flex-col gap-2">
+					<label for="cores" class="text-sm font-medium text-slate-200">Number of cores</label>
+					<select id="cores" name="cores" multiple size="5" aria-describedby="cores-help"
+						class="h-32 w-full rounded-lg border border-panelBorder bg-slate-900/60 px-3 py-2 text-sm text-white focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-500/50">
+						<option disabled>Loading core options…</option>
+					</select>
+					<p id="cores-help" class="text-xs text-muted">Select one or more (Ctrl/Cmd or Shift-click).</p>
+				</div>
+			</div>
+			<span id="status" class="mt-4 inline-block text-sm text-muted" role="status" aria-live="polite"></span>
+		</section>
+
+		<section aria-labelledby="graph-heading"
+			class="rounded-2xl border border-panelBorder bg-panel/80 p-6 shadow-lg shadow-black/30">
+			<h2 id="graph-heading" class="text-xl font-semibold text-white">Graph</h2>
+			<div id="graph"
+				class="mt-4 min-h-[260px] overflow-auto rounded-xl border border-panelBorder bg-slate-900/60 p-4">
+				<!-- JS will fill in the graph here -->
+				<p class="text-sm text-muted">Waiting for data…</p>
+			</div>
+		</section>
+
+		<section aria-labelledby="analysis-heading"
+			class="rounded-2xl border border-panelBorder bg-panel/80 p-6 shadow-lg shadow-black/30">
+			<h2 id="analysis-heading" class="text-xl font-semibold text-white">Analysis</h2>
+			<!-- Single container that will be populated dynamically by JavaScript -->
+			<div id="analysis" class="mt-4 min-h-[160px] rounded-xl border border-panelBorder bg-slate-900/60 p-4">
+				<p class="text-sm text-muted">Waiting for analysis…</p>
+			</div>
+		</section>
+	</main>
+
+	<script>
+		// API endpoint configuration
+		const API = {
+			systemCores: '/api/cores',  // Available core counts as JSON
+			reportsGraph: '/api/graph',  // Performance graph as HTML
+			analysis: '/api/analysis',  // Analysis as JSON
+		};
+
+		// Hold all elements in a list for easy reference
+		const elements = {
+			filename: document.getElementById('filename'),
+			cores: document.getElementById('cores'),
+			graph: document.getElementById('graph'),
+			status: document.getElementById('status'),
+			analysis: document.getElementById('analysis'),
+			refresh: document.getElementById('refresh'),
+		};
+
+		function setStatus(msg) {
+			elements.status.textContent = msg || '';
+		}
+
+		// Helper to fetch JSON data from an endpoint
+		async function fetchJSON(url) {
+			const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+			if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+			return await res.json();
+		}
+
+		// Get selected core values from the select element
+		function getSelectedCores() {
+			return Array.from(elements.cores.selectedOptions).map(o => o.value).filter(Boolean);
+		}
+
+		// Populate the cores select element with options
+		function populateCoresSelect(values) {
+			elements.cores.innerHTML = '';
+			if (!values || !values.length) {
+				const opt = document.createElement('option');
+				opt.disabled = true; opt.textContent = 'No core options available';
+				elements.cores.appendChild(opt);
+				return;
 			}
-
-			// Get selected core values from the select element
-			function getSelectedCores() {
-				return Array.from(elements.cores.selectedOptions).map(o => o.value).filter(Boolean);
+			for (const v of values) {
+				let value = String(v.cores);
+				const opt = document.createElement('option');
+				opt.value = String(value);
+				opt.textContent = String(value);
+				elements.cores.appendChild(opt);
 			}
+		}
 
-			// Populate the cores select element with options
-			function populateCoresSelect(values) {
-				elements.cores.innerHTML = '';
-				if (!values || !values.length) {
-					const opt = document.createElement('option');
-					opt.disabled = true; opt.textContent = 'No core options available';
-					elements.cores.appendChild(opt);
+		// Load available core options from the API
+		async function loadCores() {
+			try {
+				const data = await fetchJSON(API.systemCores);
+				const values = Array.isArray(data) ? data : (Array.isArray(data.options) ? data.options : []);
+				populateCoresSelect(values);
+			} catch (e) {
+				// Graceful fallback
+				populateCoresSelect([1, 2, 4, 8]);
+				setStatus('Using default core options (endpoint unavailable).');
+			}
+		}
+
+		// Load and display the graph from the API
+		async function loadGraph() {
+			const file = elements.filename.value.trim();
+			const cores = getSelectedCores();
+			elements.graph.innerHTML = '<p class="muted">Loading graph…</p>';
+			try {
+				const url = new URL(API.reportsGraph, window.location.origin);
+				if (file) url.searchParams.set('file', file);
+				if (cores.length) url.searchParams.set('cores', cores.join(','));
+				const res = await fetch(url.toString(), { headers: { 'Accept': 'text/html' } });
+				if (!res.ok) throw new Error(`Graph request failed: ${res.status}`);
+				const html = await res.text();
+				elements.graph.innerHTML = html || '<p class="muted">No graph returned.</p>';
+			} catch (e) {
+				elements.graph.innerHTML = '<p class="muted">Could not load graph. Ensure the reports/graph endpoint is available.</p>';
+			}
+		}
+
+		// Load analysis statements from the API
+		async function loadAnalysis() {
+			elements.analysis.innerHTML = '<p class="text-sm text-muted">Loading analysis…</p>';
+
+			// small helpers
+			const toNumber = (v, d = 0) => (typeof v === 'number' ? v : Number(v ?? d));
+			const rankNum = (k) => {
+				if (Number.isInteger(k)) return k;
+				const m = String(k).match(/rank\s*(\d+)/i);
+				return m ? Number(m[1]) : Number.POSITIVE_INFINITY;
+			};
+
+			try {
+				// gather inputs (the server may ignore them for now)
+				const file = elements.filename.value.trim();
+				const cores = getSelectedCores().map(Number);
+
+				const res = await fetch(API.analysis, {
+					method: 'POST',
+					headers: {
+						'Accept': 'application/json',
+						'Content-Type': 'application/json'
+					},
+					body: JSON.stringify({ filename: file, numP: cores })
+				});
+				if (!res.ok) throw new Error(`Analysis request failed: ${res.status}`);
+				const data = await res.json();
+
+				const analyses = Array.isArray(data?.analyses) ? data.analyses : [];
+				if (!analyses.length) {
+					elements.analysis.innerHTML = '<p class="text-sm text-muted">No analysis results returned.</p>';
 					return;
 				}
-				for (const v of values) {
-					let value = String(v.cores);
-					const opt = document.createElement('option');
-					opt.value = String(value);
-					opt.textContent = String(value);
-					elements.cores.appendChild(opt);
+
+				// Build the Analysis panel
+				const wrapper = document.createElement('div');
+				wrapper.className = 'space-y-4';
+
+				analyses.forEach((run) => {
+					const np = toNumber(run.num_processes);
+					const speedup = toNumber(run.speedup);
+					const efficiency = toNumber(run.efficiency);
+					const fp = Math.min(1, Math.max(0, toNumber(run.fp))); // clamp [0,1]
+					const fpPct = (fp * 100).toFixed(2);
+					const serialPct = (100 - fp * 100).toFixed(2);
+
+					// collect rank runtimes (accept 'rank N' keys or integer keys)
+					const rankEntries = Object.entries(run)
+						.filter(([k, v]) => (/^rank\s*\d+$/i.test(String(k)) || Number.isInteger(k)) && typeof v === 'number')
+						.sort((a, b) => rankNum(a[0]) - rankNum(b[0]));
+
+					// Card container
+					const card = document.createElement('div');
+					card.className = 'rounded-xl border border-panelBorder bg-slate-900/60 p-4';
+
+					// Header
+					const h = document.createElement('div');
+					h.className = 'flex items-center justify-between';
+					h.innerHTML = `
+					<h3 class="text-lg font-semibold text-white">Processes: <span class="font-mono">${np}</span></h3>
+				`;
+					card.appendChild(h);
+
+					// Metrics grid
+					const grid = document.createElement('div');
+					grid.className = 'mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4';
+					grid.innerHTML = `
+					<div class="rounded-lg border border-panelBorder p-3">
+					<div class="text-xs text-muted">Speedup</div>
+					<div class="text-base font-semibold">${speedup.toFixed(3)}</div>
+					</div>
+					<div class="rounded-lg border border-panelBorder p-3">
+					<div class="text-xs text-muted">Efficiency</div>
+					<div class="text-base font-semibold">${efficiency.toFixed(3)}</div>
+					</div>
+					<div class="rounded-lg border border-panelBorder p-3">
+					<div class="text-xs text-muted">Parallel Fraction (fₚ)</div>
+					<div class="text-base font-semibold">${fpPct}%</div>
+					</div>
+					<div class="rounded-lg border border-panelBorder p-3">
+					<div class="text-xs text-muted">Serial Fraction (1−fₚ)</div>
+					<div class="text-base font-semibold">${serialPct}%</div>
+					</div>
+				`;
+					card.appendChild(grid);
+
+					// Dropdown (per-rank runtimes)
+					const details = document.createElement('details');
+					details.className = 'mt-3 rounded-lg border border-panelBorder';
+					const summary = document.createElement('summary');
+					summary.className = 'cursor-pointer select-none px-3 py-2 text-sm font-medium text-slate-200';
+					summary.textContent = 'Per-rank runtimes';
+					details.appendChild(summary);
+
+					const list = document.createElement('div');
+					list.className = 'px-3 pb-3';
+					if (rankEntries.length) {
+						const ul = document.createElement('ul');
+						ul.className = 'mt-2 space-y-1 text-sm';
+						for (const [k, v] of rankEntries) {
+							const li = document.createElement('li');
+							li.className = 'font-mono text-slate-200';
+							li.textContent = `rank ${rankNum(k)}: ${v.toFixed(6)} s`;
+							ul.appendChild(li);
+						}
+						list.appendChild(ul);
+					} else {
+						list.innerHTML = '<p class="text-sm text-muted mt-2">No per-rank runtimes reported.</p>';
+					}
+					details.appendChild(list);
+					card.appendChild(details);
+
+					wrapper.appendChild(card);
+				});
+
+				// Replace analysis contents
+				elements.analysis.replaceChildren(wrapper);
+
+				// Update the main graph with the last run's returned graph (if present)
+				const last = analyses[analyses.length - 1];
+				if (last?.graph) {
+					elements.graph.innerHTML = last.graph;
 				}
+			} catch (e) {
+				elements.analysis.innerHTML = `<p class="text-sm text-red-400">Could not load analysis: ${e.message}</p>`;
 			}
+		}
 
-			// Load available core options from the API
-			async function loadCores() {
-				try {
-					const data = await fetchJSON(API.systemCores);
-					const values = Array.isArray(data) ? data : (Array.isArray(data.options) ? data.options : []);
-					populateCoresSelect(values);
-				} catch (e) {
-					// Graceful fallback
-					populateCoresSelect([1, 2, 4, 8]);
-					setStatus('Using default core options (endpoint unavailable).');
-				}
-			}
+		// Helper to refresh all the data from all elements
+		async function refreshAll() {
+			setStatus('Updating…');
+			await Promise.allSettled([loadGraph(), loadAnalysis()]);
+			setStatus('');
+		}
 
-			// Load and display the graph from the API
-			async function loadGraph() {
-				const file = elements.filename.value.trim();
-				const cores = getSelectedCores();
-				elements.graph.innerHTML = '<p class="muted">Loading graph…</p>';
-				try {
-					const url = new URL(API.reportsGraph, window.location.origin);
-					if (file) url.searchParams.set('file', file);
-					if (cores.length) url.searchParams.set('cores', cores.join(','));
-					const res = await fetch(url.toString(), { headers: { 'Accept': 'text/html' } });
-					if (!res.ok) throw new Error(`Graph request failed: ${res.status}`);
-					const html = await res.text();
-					elements.graph.innerHTML = html || '<p class="muted">No graph returned.</p>';
-				} catch (e) {
-					elements.graph.innerHTML = '<p class="muted">Could not load graph. Ensure the reports/graph endpoint is available.</p>';
-				}
-			}
+		// Wire up events
+		elements.refresh.addEventListener('click', (e) => {
+			e.preventDefault();
+			refreshAll();
+		});
 
-			// Load analysis statements from the API
-			async function loadAnalysis() {
-				elements.analysis.innerHTML = '<p class="muted">Loading analysis…</p>';
-				// NOTE: Looking at this now, it is not at all optimal. However it is good enough for now.
-				
-				// TODO: fetch analysis payload from API.analysis and render it into `elements.analysis`.
-			}
+		// Initialize on page load
+		(async function init() {
+			await loadCores();
+			// Select a simple default if present
+			const firstTwo = Array.from(elements.cores.options).slice(0, 2);
+			for (const o of firstTwo) o.selected = true;
+			await refreshAll();
+		})();
+	</script>
+</body>
 
-			// Helper to refresh all the data from all elements
-			async function refreshAll() {
-				setStatus('Updating…');
-				await Promise.allSettled([loadGraph(), loadAnalysis()]);
-				setStatus('');
-			}
-
-			// Wire up events
-			elements.refresh.addEventListener('click', (e) => {
-				e.preventDefault();
-				refreshAll();
-			});
-
-			// Initialize on page load
-			(async function init() {
-				await loadCores();
-				// Select a simple default if present
-				const firstTwo = Array.from(elements.cores.options).slice(0, 2);
-				for (const o of firstTwo) o.selected = true;
-				await refreshAll();
-			})();
-		</script>
-	</body>
-	</html>
+</html>

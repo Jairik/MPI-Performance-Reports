@@ -20,11 +20,18 @@ def compile_mpi_program(filename: str = 'summation.c') -> None:
 
 def run_executable(lib, x: int = 10000000, np: int = 4) -> str:
     ''' Attempt to run the globally defined executable using mpirun with a specified number of processes and x parameter '''
+    cmd = ["mpirun", "--oversubscribe", "-np", str(np), "./summation", str(x)]
     try:
-        result = subprocess.run(['mpirun', '-np', f'{np}', f'./{executable}', f'{x}'], capture_output=True, text=True, check=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
     except subprocess.CalledProcessError as e:
-        print(f"Execution failed: {e}")
-        exit(1)
+        # Show both stdout and stderr to see OpenMPI’s error
+        msg = (
+            f"Command failed: {' '.join(cmd)}\n"
+            f"Exit code: {e.returncode}\n\n"
+            f"--- STDOUT ---\n{e.stdout}\n"
+            f"--- STDERR ---\n{e.stderr}\n"
+        )
+        raise RuntimeError(msg)
     return result.stdout  # Return the output for further processing
 
 def parse_execution_output(lib, output: str, np: int, serial_time: float = None) -> dict:

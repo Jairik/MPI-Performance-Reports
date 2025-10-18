@@ -51,13 +51,13 @@ def get_analysis(filename: str = 'summation.c', x: int = 10000000, numP: list[in
     for np in numP:
         result = gp.run_executable(lib, x, np)  # Run the compiled executable
         analysis_results: dict = gp.parse_execution_output(lib=lib, output=result, np=np, serial_time=serial_runtime)  # Parse the output into a dictionary
-        fig = gp.get_general_admahls_plot(lib)  # Get the general Amdahl's Law plot
-        updated_fig = gp.add_analysis_point_to_plot(fig, analysis_results['fp'], analysis_results['speedup'], np)  # Add the analysis point to the plot
-        analysis_results['graph'] = updated_fig.to_html(full_html=False)  # Add the updated graph as HTML to the results
-        response.setdefault('analyses', []).append({'num_processes': np, **analysis_results})  # Add the analysis results to the response object keyed by number of processes
         # Store the serial runtime for reference
         if np == 1:
             serial_runtime = analysis_results.get('serial', None)  # Store the serial runtime
+        fig = gp.get_general_admahls_plot(lib)  # Get the general Amdahl's Law plot
+        updated_fig = gp.add_cur_theoretical_to_fig(lib, fig, analysis_results['fp'])  # Add the analysis point to the plot
+        analysis_results['graph'] = updated_fig.to_html(full_html=False)  # Add the updated graph as HTML to the results
+        response.setdefault('analyses', []).append({'num_processes': np, **analysis_results})  # Add the analysis results to the response object keyed by number of processes
     
     return response
 
